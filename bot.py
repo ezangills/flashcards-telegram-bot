@@ -32,14 +32,15 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def list_decks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = DatabaseManager(update.message.from_user.id)
-    decks = [deck.name for deck in db.decks]
+    deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
+    deck_names = [deck.name for deck in sorted(db.decks, key=lambda deck: deck.name)]
     if (update.message.from_user.id not in user_general_session):
         user_general_session[update.message.from_user.id] = {}
 
     user_general_session[update.message.from_user.id]["page"] = 0
     page = user_general_session[update.message.from_user.id]["page"]
-    if decks:
-        keyboard = __list_decks(decks, page)
+    if deck_ids:
+        keyboard = __list_decks(deck_ids, deck_names, page)
         await update.message.reply_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
     else:
         await update.message.reply_text("No decks available.")
@@ -281,14 +282,15 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if query.data == "command_switch_deck":
         db = DatabaseManager(query.from_user.id)
-        decks = [deck.name for deck in db.decks]
+        deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
+        deck_names = [deck.name for deck in sorted(db.decks, key=lambda deck: deck.name)]
         if (query.from_user.id not in user_general_session):
             user_general_session[query.from_user.id] = {}
 
         user_general_session[query.from_user.id]["page"] = 0
         page = user_general_session[query.from_user.id]["page"]
-        if decks:
-            keyboard = __list_decks(decks, page)
+        if deck_ids:
+            keyboard = __list_decks(deck_ids, deck_names, page)
             await query.edit_message_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             await query.edit_message_text("No decks available.")
@@ -323,21 +325,25 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if (query.from_user.id not in user_general_session):
             user_general_session[query.from_user.id] = {}
 
-        deck_name = query.data.split("deck_")[1]
-        user_general_session[query.from_user.id]["deck_name"] = deck_name
+        deck_id = query.data.split("deck_")[1]
+        for deck in db.decks:
+            if deck.id == deck_id:
+                user_general_session[query.from_user.id]["deck_name"] = deck.name
         keyboard = [
             [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
             [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
             [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
         ]
         await query.edit_message_text(
-            text="Current Deck: " + deck_name,
+            text="Current Deck: " + user_general_session[query.from_user.id]["deck_name"],
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
     if query.data.startswith("page_"):
         page = int(query.data.split("page_")[1])
-        keyboard = __list_decks([deck.name for deck in db.decks], page)
+        deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
+        deck_names = [deck.name for deck in sorted(db.decks, key=lambda deck: deck.name)]
+        keyboard = __list_decks(deck_ids, deck_names, page)
         await query.edit_message_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     if query.data.startswith("delete_card_"):
@@ -376,12 +382,15 @@ def __list_cards(cards, page_ce):
         keyboard_ce.append(navigation_buttons_ce)
     return keyboard_ce
 
-def __list_decks(decks, page):
+def __list_decks(deck_ids, deck_names, page):
     items_per_page = 5
-    total_pages = int(len(decks) / items_per_page)
+    total_pages = int(len(deck_ids) / items_per_page)
     start_index = page * items_per_page
     end_index = start_index + items_per_page
-    keyboard = [[InlineKeyboardButton(deck_name, callback_data=f"deck_{deck_name}")] for deck_name in decks[start_index:end_index]]
+    keyboard = []
+    for i in range(len(deck_ids)):
+        if i >= start_index and i <= end_index:
+            keyboard.append([InlineKeyboardButton(deck_names[i], callback_data=f"deck_{deck_ids[i]}")])
     navigation_buttons = []
     if page > 0:
         navigation_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"page_{page - 1}"))

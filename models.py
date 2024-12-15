@@ -32,8 +32,9 @@ class Card:
 
 
 class Deck:
-    def __init__(self, name):
+    def __init__(self, name, id=str(uuid4())):
         self.name = name
+        self.id = id
         self.cards = []
 
     def add_card(self, card):
@@ -45,11 +46,12 @@ class Deck:
     def to_dict(self):
         return {
             "name": self.name,
+            "id": self.id,
             "cards": [card.to_dict() for card in self.cards]
         }
 
     @classmethod
     def from_dict(cls, data):
-        deck = cls(data["name"])
+        deck = cls(data["name"], data["id"])
         deck.cards = [Card.from_dict(card) for card in data["cards"]]
         return deck
