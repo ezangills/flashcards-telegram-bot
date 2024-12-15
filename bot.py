@@ -327,7 +327,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_general_session[query.from_user.id]["deck_name"] = deck_name
         keyboard = [
             [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
-            [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Edit Cards", callback_data=f"command_delete_cards_in_deck")],
+            [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
             [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
         ]
         await query.edit_message_text(
