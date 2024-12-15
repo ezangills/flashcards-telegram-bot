@@ -205,41 +205,45 @@ async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Deck '{deck_name}' deleted.")
         else:
             await update.message.reply_text(f"Deck '{deck_name}' not found.")
-    if update.message.reply_to_message and "Type in FRONT (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")" == update.message.reply_to_message.text:
-        user_general_session[update.message.from_user.id]["front"] = update.message.text
-        await update.message.reply_text(
-            text="Type in BACK (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")",
-            reply_markup=ForceReply()
-        )
-        return
-    if update.message.reply_to_message and "Type in BACK (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")" == update.message.reply_to_message.text:
-        front = user_general_session[update.message.from_user.id]["front"]
-        back = update.message.text
-        db.add_card(user_general_session[update.message.from_user.id]["deck_name"], front, back, update.message.from_user.id)
-        await update.message.reply_text("Card has been added to Deck " + user_general_session[update.message.from_user.id]["deck_name"] + " and saved.")
-        await update.message.reply_text(
-            text="Type in FRONT (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")",
-            reply_markup=ForceReply()
-        )
-        return
-    if update.message.reply_to_message and f"Step 4: Type the back for: '{correctCard.front}'" == update.message.reply_to_message.text:
-        back = update.message.text
-        if correctCard.back == back:
-            await update.message.reply_text("Correct! ✅")
-        else:
-            await update.message.reply_text("Incorrect. ❌")
-        await present_next_card(update, update.message.from_user.id, context)
-        return
-    if update.message.reply_to_message and f"Step 5: Type the front for: '{correctCard.back}'" == update.message.reply_to_message.text:
-        front = update.message.text
-        if correctCard.front == front:
-            user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["correct"] += 1
-            await update.message.reply_text("Correct! ✅")
-        else:
-            user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["correct"] += 1
-            await update.message.reply_text("Incorrect. ❌")
-        await present_next_card(update, update.message.from_user.id, context)
-        return
+    if "deck_name" in user_general_session[update.message.from_user.id]:
+        if update.message.reply_to_message and "Type in FRONT (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")" == update.message.reply_to_message.text:
+            user_general_session[update.message.from_user.id]["front"] = update.message.text
+            await update.message.reply_text(
+                text="Type in BACK (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")",
+                reply_markup=ForceReply()
+            )
+            return
+        if update.message.reply_to_message and "Type in BACK (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")" == update.message.reply_to_message.text:
+            front = user_general_session[update.message.from_user.id]["front"]
+            back = update.message.text
+            db.add_card(user_general_session[update.message.from_user.id]["deck_name"], front, back, update.message.from_user.id)
+            await update.message.reply_text("Card has been added to Deck " + user_general_session[update.message.from_user.id]["deck_name"] + " and saved.")
+            await update.message.reply_text(
+                text="Type in FRONT (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")",
+                reply_markup=ForceReply()
+            )
+            return
+    if correctCard:
+        if update.message.reply_to_message and f"Step 4: Type the back for: '{correctCard.front}'" == update.message.reply_to_message.text:
+            back = update.message.text
+            if correctCard.back == back:
+                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["correct"] += 1
+                await update.message.reply_text("Correct! ✅")
+            else:
+                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["incorrect"] += 1
+                await update.message.reply_text("Incorrect. ❌")
+            await present_next_card(update, update.message.from_user.id, context)
+            return
+        if update.message.reply_to_message and f"Step 5: Type the front for: '{correctCard.back}'" == update.message.reply_to_message.text:
+            front = update.message.text
+            if correctCard.front == front:
+                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["correct"] += 1
+                await update.message.reply_text("Correct! ✅")
+            else:
+                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["incorrect"] += 1
+                await update.message.reply_text("Incorrect. ❌")
+            await present_next_card(update, update.message.from_user.id, context)
+            return
 
     await show_menu(update, context)
 

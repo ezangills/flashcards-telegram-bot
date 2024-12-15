@@ -7,15 +7,15 @@ class DatabaseManager:
 
     def load_decks(self, userId):
         try:
-            with open(str(userId) + ".json", "r") as f:
+            with open(str(userId) + ".json", "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return [Deck.from_dict(deck) for deck in data]
         except FileNotFoundError:
             return []
 
     def save_decks(self, userId):
-        with open(str(userId) + ".json", "w") as f:
-            json.dump([deck.to_dict() for deck in self.decks], f, indent=4)
+        with open(str(userId) + ".json", "w", encoding="utf-8") as f:
+            json.dump([deck.to_dict() for deck in self.decks], f, ensure_ascii=False, indent=4)
 
     def get_deck(self, name):
         for deck in self.decks:
