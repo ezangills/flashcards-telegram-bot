@@ -68,7 +68,7 @@ async def present_next_card(update: Update, user_id, context: ContextTypes.DEFAU
 
     # Get the current card
     card = cards[session["current_card_index"]]
-    session["current_card_id"] = card.front + "###" + card.back
+    session["current_card_id"] = card.id
     current_step = session["current_step"]
 
     if current_step == 1:
@@ -137,7 +137,7 @@ async def show_results(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     results = []
     for card in cards:
-        progress = session["progress"][card.front+"###"+card.back]
+        progress = session["progress"][card.id]
         correct = progress["correct"]
         incorrect = progress["incorrect"]
 
@@ -310,9 +310,9 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
 
         for card in cards:
-            user_learning_sessions[user_id]["progress"][card.front+"###"+card.back] = {}
-            user_learning_sessions[user_id]["progress"][card.front+"###"+card.back]["correct"] = 0
-            user_learning_sessions[user_id]["progress"][card.front+"###"+card.back]["incorrect"] = 0
+            user_learning_sessions[user_id]["progress"][card.id] = {}
+            user_learning_sessions[user_id]["progress"][card.id]["correct"] = 0
+            user_learning_sessions[user_id]["progress"][card.id]["incorrect"] = 0
 
         await query.message.reply_text(f"Starting learning session for deck '{deck_name}'.")
 
@@ -341,9 +341,8 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     if query.data.startswith("delete_card_"):
-        front = (query.data.split("delete_card_")[1]).split("###")[0]
-        back = (query.data.split("delete_card_")[1]).split("###")[1]
-        db.delete_card(user_general_session[query.from_user.id]["deck_name"], front, back, query.from_user.id)
+        id = (query.data.split("delete_card_")[1])
+        db.delete_card(user_general_session[query.from_user.id]["deck_name"], id, query.from_user.id)
         cards = db.select_cards(user_general_session[query.from_user.id]["deck_name"])
         keyboard_ce = __list_cards(cards, 0)
         await query.message.reply_text("Card has been deleted from Deck " + user_general_session[query.from_user.id]["deck_name"] + ".")
@@ -367,7 +366,7 @@ def __list_cards(cards, page_ce):
     total_pages_ce = int(len(cards) / items_per_page_ce)
     start_index_ce = int(page_ce) * items_per_page_ce
     end_index_ce = start_index_ce + items_per_page_ce
-    keyboard_ce = [[InlineKeyboardButton(card.front + ' + ' + card.back, callback_data=f"delete_card_{card.front + '###' + card.back}")] for card in cards[start_index_ce:end_index_ce]]
+    keyboard_ce = [[InlineKeyboardButton(card.front + ' : ' + card.back, callback_data=f"delete_card_{card.id}")] for card in cards[start_index_ce:end_index_ce]]
     navigation_buttons_ce = []
     if int(page_ce) > 0:
         navigation_buttons_ce.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"page_ce_{int(page_ce) - 1}"))
@@ -402,11 +401,11 @@ def generate_options(correct_card, all_cards, attribute):
 
 def update_card_progress(session, card, correct):
     if card not in session["progress"]:
-        session["progress"][card.front+"###"+card.back] = {"correct": 0, "incorrect": 0}
+        session["progress"][card.id] = {"correct": 0, "incorrect": 0}
     if correct:
-        session["progress"][card.front+"###"+card.back]["correct"] += 1
+        session["progress"][card.id]["correct"] += 1
     else:
-        session["progress"][card.front+"###"+card.back]["incorrect"] += 1
+        session["progress"][card.id]["incorrect"] += 1
 
 
 def main():

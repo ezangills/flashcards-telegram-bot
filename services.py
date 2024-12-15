@@ -43,10 +43,10 @@ class DatabaseManager:
             return True
         return False
 
-    def delete_card(self, deck_name, front, back, userId):
+    def delete_card(self, deck_name, id, userId):
         deck = self.get_deck(deck_name)
         if deck:
-            deck.remove_card(front, back)
+            deck.remove_card(id)
             self.save_decks(userId)
             return True
         return False
