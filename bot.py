@@ -1,14 +1,16 @@
+import configparser
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ForceReply
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 )
 from services import DatabaseManager
-from models import Card
 import random
 
 
 user_learning_sessions = {}  # user_id -> {"cards": [], "current_step": 0, "current_card_index": 0}
 user_general_session = {}
+config = configparser.ConfigParser()
+config.read("token.properties")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -376,7 +378,6 @@ def __list_decks(decks, page):
     total_pages = int(len(decks) / items_per_page)
     start_index = page * items_per_page
     end_index = start_index + items_per_page
-    print(start_index)
     keyboard = [[InlineKeyboardButton(deck_name, callback_data=f"deck_{deck_name}")] for deck_name in decks[start_index:end_index]]
     navigation_buttons = []
     if page > 0:
@@ -405,7 +406,7 @@ def update_card_progress(session, card, correct):
 
 
 def main():
-    app = ApplicationBuilder().token("TOKEN").build()
+    app = ApplicationBuilder().token(config.get("DEFAULT", "BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("menu", show_menu))
