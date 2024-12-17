@@ -1,6 +1,9 @@
 import json
 from datetime import datetime
 from models import Deck, Card
+import uuid
+import random
+import time
 
 class DatabaseManager:
     def __init__(self, userId):
@@ -24,10 +27,16 @@ class DatabaseManager:
                 return deck
         return None
 
+    def generate_uuid4(self):
+        rnd = (random.Random())
+        rnd.seed(time.time() * 1000)
+        return str(uuid.UUID(int=rnd.getrandbits(128), version=4))
+
+
     def add_deck(self, name, userId):
         if self.get_deck(name):
             return False
-        self.decks.append(Deck(name))
+        self.decks.append(Deck(name, self.generate_uuid4()))
         self.save_decks(userId)
         return True
 
@@ -39,7 +48,7 @@ class DatabaseManager:
     def add_card(self, deck_name, front, back, userId):
         deck = self.get_deck(deck_name)
         if deck:
-            deck.add_card(Card(front, back))
+            deck.add_card(Card(front, back, self.generate_uuid4()))
             self.save_decks(userId)
             return True
         return False

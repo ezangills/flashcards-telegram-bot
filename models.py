@@ -1,10 +1,7 @@
-import json
 from datetime import datetime
-from uuid import uuid4
-
 
 class Card:
-    def __init__(self, front, back, id=str(uuid4()), last_revised=None, level=0):
+    def __init__(self, front, back, id, last_revised=None, level=0):
         self.front = front
         self.back = back
         self.id = id
@@ -32,7 +29,7 @@ class Card:
 
 
 class Deck:
-    def __init__(self, name, id=str(uuid4())):
+    def __init__(self, name, id):
         self.name = name
         self.id = id
         self.cards = []
