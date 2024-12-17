@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from models import Deck, Card
 
 class DatabaseManager:
@@ -57,6 +58,7 @@ class DatabaseManager:
             for card in deck.cards:
                 if card.front == old_front and card.back == old_back:
                     card.level = level
+                    card.last_revised = datetime.now().isoformat()
                     self.save_decks(userId)
                     return True
         return False

@@ -69,26 +69,25 @@ async def present_next_card(update: Update, user_id, context: ContextTypes.DEFAU
 
     # Get the current card
     card = cards[session["current_card_index"]]
-    session["current_card_id"] = card.id
     current_step = session["current_step"]
 
     if current_step == 1:
         # Step 1: Multiple-choice for backs
         options = generate_options(card, cards, "back")
         message = f"Step 1: What is the back for: '{card.front}'?"
-        await send_options(update, context, message, options, card.back)
+        await send_options(update, context, message, options, card.back, card.id)
 
     elif current_step == 2:
         # Step 2: Matching cards (front and back)
         message = f"Step 2: Match the front '{card.front}' with the correct back."
         back_options = [c.back for c in cards]
-        await send_options(update, context, message, back_options, card.back)
+        await send_options(update, context, message, back_options, card.back, card.id)
 
     elif current_step == 3:
         # Step 3: Multiple-choice for fronts
         options = generate_options(card, cards, "front")
         message = f"Step 3: What is the front for: '{card.back}'?"
-        await send_options(update, context, message, options, card.front)
+        await send_options(update, context, message, options, card.front, card.id)
 
     elif current_step == 4:
         # Step 4: Typing the back
@@ -112,9 +111,9 @@ async def present_next_card(update: Update, user_id, context: ContextTypes.DEFAU
     session["current_card_index"] += 1
 
 
-async def send_options(update, context, question, options, correct_option):
+async def send_options(update, context, question, options, correct_option, correct_card_id):
     keyboard = [
-        [InlineKeyboardButton(option, callback_data=("correct" if option == correct_option else "incorrect"))]
+        [InlineKeyboardButton(option, callback_data=("correct_" + correct_card_id if option == correct_option else "incorrect_" + correct_card_id))]
         for option in options
     ]
 
@@ -171,14 +170,14 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_response = update.message.text.strip()
 
     if current_step == 4 and user_response == card.back:
-        await update.message.reply_text("Correct!")
+        await update.message.reply_text("Correct! (test)")
         #update_card_progress(session, card, True)
     elif current_step == 5 and user_response == card.front:
-        await update.message.reply_text("Correct!")
+        await update.message.reply_text("Correct! (test)")
         #update_card_progress(session, card, True)
     else:
         correct_answer = card.back if current_step == 4 else card.front
-        await update.message.reply_text(f"Incorrect. The correct answer is: {correct_answer}")
+        await update.message.reply_text(f"Incorrect. The correct answer is: {correct_answer} (test)")
         #update_card_progress(session, card, False)
 
     # Continue to the next card or step
@@ -187,40 +186,42 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if this is a reply to the ForceReply prompt
-    db = DatabaseManager(update.message.from_user.id)
-    session = user_learning_sessions.get(update.message.from_user.id)
+    user_id = update.message.from_user.id
+    db = DatabaseManager(user_id)
+    session = user_learning_sessions.get(user_id)
     correctCard = None
+
     if session is not None:
         if "correctCard" in session:
             correctCard = session["correctCard"]
     if update.message.reply_to_message and "Enter Deck Name" == update.message.reply_to_message.text:
         deck_name = update.message.text  # The user's input
-        if db.add_deck(deck_name, update.message.from_user.id):
+        if db.add_deck(deck_name, user_id):
             await update.message.reply_text(f"Deck '{deck_name}' created.")
         else:
             await update.message.reply_text(f"Deck '{deck_name}' already exists.")
     if update.message.reply_to_message and "Enter Deck Name that you want to DELETE" == update.message.reply_to_message.text:
         deck_name = update.message.text
         if db.get_deck(deck_name):
-            db.delete_deck(deck_name, update.message.from_user.id)
+            db.delete_deck(deck_name, user_id)
             await update.message.reply_text(f"Deck '{deck_name}' deleted.")
         else:
             await update.message.reply_text(f"Deck '{deck_name}' not found.")
-    if "deck_name" in user_general_session[update.message.from_user.id]:
-        if update.message.reply_to_message and "Type in FRONT (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")" == update.message.reply_to_message.text:
-            user_general_session[update.message.from_user.id]["front"] = update.message.text
+    if "deck_name" in user_general_session[user_id]:
+        if update.message.reply_to_message and "Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")" == update.message.reply_to_message.text:
+            user_general_session[user_id]["front"] = update.message.text
             await update.message.reply_text(
-                text="Type in BACK (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")",
+                text="Type in BACK (Deck: " + user_general_session[user_id]["deck_name"] + ")",
                 reply_markup=ForceReply()
             )
             return
-        if update.message.reply_to_message and "Type in BACK (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")" == update.message.reply_to_message.text:
-            front = user_general_session[update.message.from_user.id]["front"]
+        if update.message.reply_to_message and "Type in BACK (Deck: " + user_general_session[user_id]["deck_name"] + ")" == update.message.reply_to_message.text:
+            front = user_general_session[user_id]["front"]
             back = update.message.text
-            db.add_card(user_general_session[update.message.from_user.id]["deck_name"], front, back, update.message.from_user.id)
-            await update.message.reply_text("Card has been added to Deck " + user_general_session[update.message.from_user.id]["deck_name"] + " and saved.")
+            db.add_card(user_general_session[user_id]["deck_name"], front, back, user_id)
+            await update.message.reply_text("Card has been added to Deck " + user_general_session[user_id]["deck_name"] + " and saved.")
             await update.message.reply_text(
-                text="Type in FRONT (Deck: " + user_general_session[update.message.from_user.id]["deck_name"] + ")",
+                text="Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")",
                 reply_markup=ForceReply()
             )
             return
@@ -228,22 +229,22 @@ async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.message.reply_to_message and f"Step 4: Type the back for: '{correctCard.front}'" == update.message.reply_to_message.text:
             back = update.message.text
             if correctCard.back == back:
-                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["correct"] += 1
+                user_learning_sessions[user_id]["progress"][correctCard.id]["correct"] += 1
                 await update.message.reply_text("Correct! ✅")
             else:
-                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["incorrect"] += 1
+                user_learning_sessions[user_id]["progress"][correctCard.id]["incorrect"] += 1
                 await update.message.reply_text("Incorrect. ❌")
-            await present_next_card(update, update.message.from_user.id, context)
+            await present_next_card(update, user_id, context)
             return
         if update.message.reply_to_message and f"Step 5: Type the front for: '{correctCard.back}'" == update.message.reply_to_message.text:
             front = update.message.text
             if correctCard.front == front:
-                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["correct"] += 1
+                user_learning_sessions[user_id]["progress"][correctCard.id]["correct"] += 1
                 await update.message.reply_text("Correct! ✅")
             else:
-                user_learning_sessions[update.message.from_user.id]["progress"][user_learning_sessions[update.message.from_user.id]["current_card_id"]]["incorrect"] += 1
+                user_learning_sessions[user_id]["progress"][correctCard.id]["incorrect"] += 1
                 await update.message.reply_text("Incorrect. ❌")
-            await present_next_card(update, update.message.from_user.id, context)
+            await present_next_card(update, user_id, context)
             return
 
     await show_menu(update, context)
@@ -252,7 +253,8 @@ async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    db = DatabaseManager(query.from_user.id)
+    user_id = query.from_user.id
+    db = DatabaseManager(user_id)
 
     if query.data == "command_add_deck":
         await query.message.reply_text(
@@ -268,7 +270,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if query.data == "command_add_cards_to_deck":
         await query.message.reply_text(
-            text="Type in FRONT (Deck: " + user_general_session[query.from_user.id]["deck_name"] + ")",
+            text="Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")",
             reply_markup=ForceReply()
         )
         return
@@ -276,19 +278,19 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         page_ce = 0
         if query.data.startswith("page_ce_"):
             page_ce = query.data.split("page_ce_")[1]
-        cards = db.select_cards(user_general_session[query.from_user.id]["deck_name"])
+        cards = db.select_cards(user_general_session[user_id]["deck_name"])
         keyboard_ce = __list_cards(cards, page_ce)
-        await query.edit_message_text(text="Delete card from Deck " + user_general_session[query.from_user.id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
+        await query.edit_message_text(text="Delete card from Deck " + user_general_session[user_id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
         return
     if query.data == "command_switch_deck":
-        db = DatabaseManager(query.from_user.id)
+        db = DatabaseManager(user_id)
         deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
         deck_names = [deck.name for deck in sorted(db.decks, key=lambda deck: deck.name)]
-        if (query.from_user.id not in user_general_session):
-            user_general_session[query.from_user.id] = {}
+        if (user_id not in user_general_session):
+            user_general_session[user_id] = {}
 
-        user_general_session[query.from_user.id]["page"] = 0
-        page = user_general_session[query.from_user.id]["page"]
+        user_general_session[user_id]["page"] = 0
+        page = user_general_session[user_id]["page"]
         if deck_ids:
             keyboard = __list_decks(deck_ids, deck_names, page)
             await query.edit_message_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -297,13 +299,12 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_menu(query, context)
         return
     if query.data == "command_learn_deck":
-        deck_name = user_general_session[query.from_user.id]["deck_name"]
+        deck_name = user_general_session[user_id]["deck_name"]
         cards = db.select_cards_for_learning(deck_name)
         if not cards:
             await query.message.reply_text(f"No cards available for learning in deck '{deck_name}'.")
             return
 
-        user_id = query.from_user.id
         user_learning_sessions[user_id] = {
             "cards": cards,
             "current_step": 1,
@@ -322,20 +323,20 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await present_next_card(query, user_id, context)
         return
     if query.data.startswith("deck_"):
-        if (query.from_user.id not in user_general_session):
-            user_general_session[query.from_user.id] = {}
+        if (user_id not in user_general_session):
+            user_general_session[user_id] = {}
 
         deck_id = query.data.split("deck_")[1]
         for deck in db.decks:
             if deck.id == deck_id:
-                user_general_session[query.from_user.id]["deck_name"] = deck.name
+                user_general_session[user_id]["deck_name"] = deck.name
         keyboard = [
             [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
             [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
             [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
         ]
         await query.edit_message_text(
-            text="Current Deck: " + user_general_session[query.from_user.id]["deck_name"],
+            text="Current Deck: " + user_general_session[user_id]["deck_name"],
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
@@ -348,21 +349,20 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if query.data.startswith("delete_card_"):
         id = (query.data.split("delete_card_")[1])
-        db.delete_card(user_general_session[query.from_user.id]["deck_name"], id, query.from_user.id)
-        cards = db.select_cards(user_general_session[query.from_user.id]["deck_name"])
+        db.delete_card(user_general_session[user_id]["deck_name"], id, user_id)
+        cards = db.select_cards(user_general_session[user_id]["deck_name"])
         keyboard_ce = __list_cards(cards, 0)
-        await query.message.reply_text("Card has been deleted from Deck " + user_general_session[query.from_user.id]["deck_name"] + ".")
-        await query.edit_message_text(text="Delete card from Deck " + user_general_session[query.from_user.id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
+        await query.message.reply_text("Card has been deleted from Deck " + user_general_session[user_id]["deck_name"] + ".")
+        await query.edit_message_text(text="Delete card from Deck " + user_general_session[user_id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
         return
-    if query.data == "correct":
-        user_learning_sessions[query.from_user.id]["progress"][user_learning_sessions[query.from_user.id]["current_card_id"]]["correct"] += 1
+    if query.data.startswith("correct_"):
+        user_learning_sessions[user_id]["progress"][query.data.split("correct_")[1]]["correct"] += 1
         await query.edit_message_text("Correct! ✅")
-    if query.data == "incorrect":
-        user_learning_sessions[query.from_user.id]["progress"][user_learning_sessions[query.from_user.id]["current_card_id"]]["incorrect"] += 1
+    if query.data.startswith("incorrect"):
+        user_learning_sessions[user_id]["progress"][query.data.split("incorrect_")[1]]["incorrect"] += 1
         await query.edit_message_text("Incorrect. ❌")
 
     # Proceed to the next card
-    user_id = query.from_user.id
     session = user_learning_sessions.get(user_id)
     await present_next_card(query, user_id, context)
 
@@ -406,15 +406,6 @@ def generate_options(correct_card, all_cards, attribute):
     options.append(getattr(correct_card, attribute))  # Add the correct option
     random.shuffle(options)  # Shuffle the options
     return options
-
-
-def update_card_progress(session, card, correct):
-    if card not in session["progress"]:
-        session["progress"][card.id] = {"correct": 0, "incorrect": 0}
-    if correct:
-        session["progress"][card.id]["correct"] += 1
-    else:
-        session["progress"][card.id]["incorrect"] += 1
 
 
 def main():
