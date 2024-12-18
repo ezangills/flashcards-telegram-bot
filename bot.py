@@ -312,7 +312,14 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if query.data.startswith("page_ce_"):
             page_ce = query.data.split("page_ce_")[1]
         cards = db.select_cards(user_general_session[user_id]["deck_name"])
+        deck_id = ""
+        for deck in db.decks:
+            if deck.name == user_general_session[user_id]["deck_name"]:
+                deck_id = deck.id
         keyboard_ce = __list_cards(cards, page_ce)
+        navigation_buttons_ce = []
+        navigation_buttons_ce.append(InlineKeyboardButton("🚫Exit", callback_data="deck_" + deck_id))
+        keyboard_ce.append(navigation_buttons_ce)
         await query.edit_message_text(text="Delete card from Deck " + user_general_session[user_id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
         return
     if query.data == "command_switch_deck":
@@ -384,9 +391,15 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         id = (query.data.split("delete_card_")[1])
         db.delete_card(user_general_session[user_id]["deck_name"], id, user_id)
         cards = db.select_cards(user_general_session[user_id]["deck_name"])
+        deck_id = ""
+        for deck in db.decks:
+            if deck.name == user_general_session[user_id]["deck_name"]:
+                deck_id = deck.id
         keyboard_ce = __list_cards(cards, 0)
-        await query.message.reply_text("Card has been deleted from Deck " + user_general_session[user_id]["deck_name"] + ".")
-        await query.edit_message_text(text="Delete card from Deck " + user_general_session[user_id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
+        navigation_buttons_ce = []
+        navigation_buttons_ce.append(InlineKeyboardButton("🚫Exit", callback_data="deck_" + deck_id))
+        keyboard_ce.append(navigation_buttons_ce)
+        await query.edit_message_text(text="Card has been deleted from Deck " + user_general_session[user_id]["deck_name"] + ".\nDelete card from Deck " + user_general_session[user_id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
         return
     if query.data.startswith("correct_"):
         user_learning_sessions[user_id]["progress"][query.data.split("correct_")[1]]["correct"] += 1
