@@ -30,6 +30,30 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text="Menu", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
+async def cancel_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    if (user_id not in user_general_session):
+        user_general_session[user_id] = {}
+
+    if user_general_session[user_id]["deck_name"]:
+        keyboard = [
+            [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
+            [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
+            [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
+        ]
+        await update.message.reply_text(
+            text="Current Deck: " + user_general_session[user_id]["deck_name"],
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    else:
+        keyboard = [
+            [InlineKeyboardButton("List Decks", callback_data=f"command_switch_deck"), InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck")]
+        ]
+        await update.message.reply_text(text="Menu", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+
 async def list_decks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = DatabaseManager(update.message.from_user.id)
     deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
@@ -217,20 +241,20 @@ async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(f"Deck '{deck_name}' not found.")
     if "deck_name" in user_general_session[user_id]:
-        if update.message.reply_to_message and "Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")" == update.message.reply_to_message.text:
+        if update.message.reply_to_message and "Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")\n/cancel to stop adding (or any command)" == update.message.reply_to_message.text:
             user_general_session[user_id]["front"] = update.message.text
             await update.message.reply_text(
-                text="Type in BACK (Deck: " + user_general_session[user_id]["deck_name"] + ")",
+                text="Type in BACK (Deck: " + user_general_session[user_id]["deck_name"] + ")\n/cancel to stop adding (or any command)",
                 reply_markup=ForceReply()
             )
             return
-        if update.message.reply_to_message and "Type in BACK (Deck: " + user_general_session[user_id]["deck_name"] + ")" == update.message.reply_to_message.text:
+        if update.message.reply_to_message and "Type in BACK (Deck: " + user_general_session[user_id]["deck_name"] + ")\n/cancel to stop adding (or any command)" == update.message.reply_to_message.text:
             front = user_general_session[user_id]["front"]
             back = update.message.text
             db.add_card(user_general_session[user_id]["deck_name"], front, back, user_id)
             await update.message.reply_text("Card has been added to Deck " + user_general_session[user_id]["deck_name"] + " and saved.")
             await update.message.reply_text(
-                text="Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")",
+                text="Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")\n/cancel to stop adding (or any command)",
                 reply_markup=ForceReply()
             )
             return
@@ -279,7 +303,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if query.data == "command_add_cards_to_deck":
         await query.message.reply_text(
-            text="Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")",
+            text="Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")\n/cancel to stop adding (or any command)",
             reply_markup=ForceReply()
         )
         return
@@ -423,6 +447,7 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("menu", show_menu))
     app.add_handler(CommandHandler("list", list_decks))
+    app.add_handler(CommandHandler("cancel", cancel_adding))
     app.add_handler(CallbackQueryHandler(handle_answer))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_reply))
     print("Bot is running...")
