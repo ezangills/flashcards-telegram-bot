@@ -150,7 +150,16 @@ async def show_results(update: Update, context: ContextTypes.DEFAULT_TYPE):
         results.append(f"Card '{card.front}' - Correct: {correct}, Incorrect: {incorrect}, Level: {card.level}")
         db.edit_card(user_general_session[update.message.from_user.id]["deck_name"], card.front, card.back, card.level, user_id)
     # Display results
-    await update.message.reply_text("Learning Session Complete! Results:\n" + "\n".join(results))
+    keyboard = [
+        [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
+        [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
+        [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
+    ]
+    result_message = "Learning Session Complete! Results:\n" + "\n".join(results) + "Current Deck: " + user_general_session[user_id]["deck_name"]
+    await update.message.reply_text(
+        text=result_message,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     user_learning_sessions.pop(user_id, None)  # Clear the session
 
 
