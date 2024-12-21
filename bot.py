@@ -5,6 +5,7 @@ from telegram.ext import (
 )
 from services import DatabaseManager
 import random
+import os
 
 
 user_learning_sessions = {}  # user_id -> {"cards": [], "current_step": 0, "current_card_index": 0}
@@ -455,7 +456,12 @@ def generate_options(correct_card, all_cards, attribute):
 
 
 def main():
-    app = ApplicationBuilder().token(config.get("DEFAULT", "BOT_TOKEN")).build()
+    bot_token = ""
+    if os.getenv("BOT_TOKEN"):
+        bot_token = os.getenv("BOT_TOKEN")
+    else:
+        bot_token = config.get("DEFAULT", "BOT_TOKEN")
+    app = ApplicationBuilder().token(bot_token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("menu", show_menu))
