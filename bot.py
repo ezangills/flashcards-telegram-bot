@@ -456,11 +456,7 @@ def generate_options(correct_card, all_cards, attribute):
 
 
 def main():
-    bot_token = ""
-    if os.getenv("BOT_TOKEN"):
-        bot_token = os.getenv("BOT_TOKEN")
-    else:
-        bot_token = config.get("DEFAULT", "BOT_TOKEN")
+    bot_token = os.getenv("BOT_TOKEN")
     app = ApplicationBuilder().token(bot_token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
