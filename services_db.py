@@ -76,7 +76,7 @@ class DatabaseManager:
             (name, user_id)
         )
         result = self.cursor.fetchone()
-        return Deck(result[1], result[0]) if result else None
+        return Deck(result[1], str(result[0])) if result else None
 
     def delete_deck(self, name, user_id):
         self.cursor.execute(
@@ -96,7 +96,7 @@ class DatabaseManager:
             (user_id,)
         )
         rows = self.cursor.fetchall()
-        return [Deck(name=row[1], id=row[0]) for row in rows]
+        return [Deck(name=row[1], id=str(row[0])) for row in rows]
 
     # Card Management
     def add_card(self, deck_name, front, back, user_id):
@@ -157,7 +157,7 @@ class DatabaseManager:
                 (deck.id, user_id)
             )
             rows = self.cursor.fetchall()
-            return [Card(row[1], row[2], row[0], row[3], row[4]) for row in rows]
+            return [Card(row[1], row[2], str(row[0]), row[3], row[4]) for row in rows]
         return []
 
     def select_cards(self, deck_name, user_id):
@@ -173,7 +173,7 @@ class DatabaseManager:
                 (deck.id, user_id)
             )
             rows = self.cursor.fetchall()
-            return [Card(row[1], row[2], row[0], row[3], row[4]) for row in rows]
+            return [Card(row[1], row[2], str(row[0]), row[3], row[4]) for row in rows]
         return []
 
     def close_connection(self):
