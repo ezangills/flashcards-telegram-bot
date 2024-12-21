@@ -3,7 +3,7 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKe
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 )
-from services import DatabaseManager
+from services_db import DatabaseManager
 import random
 import os
 
@@ -12,6 +12,7 @@ user_learning_sessions = {}  # user_id -> {"cards": [], "current_step": 0, "curr
 user_general_session = {}
 config = configparser.ConfigParser()
 config.read("token.properties")
+db = DatabaseManager()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,9 +57,10 @@ async def cancel_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def list_decks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    db = DatabaseManager(update.message.from_user.id)
-    deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
-    deck_names = [deck.name for deck in sorted(db.decks, key=lambda deck: deck.name)]
+    #db = DatabaseManager()
+    user_id = update.message.from_user.id
+    deck_ids = [deck.id for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
+    deck_names = [deck.name for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
     if (update.message.from_user.id not in user_general_session):
         user_general_session[update.message.from_user.id] = {}
 
@@ -158,7 +160,7 @@ async def show_results(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     session = user_learning_sessions.get(user_id)
     cards = session["cards"]
-    db = DatabaseManager(user_id)
+    #db = DatabaseManager()
 
     results = []
     for card in cards:
@@ -221,7 +223,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if this is a reply to the ForceReply prompt
     user_id = update.message.from_user.id
-    db = DatabaseManager(user_id)
+    #db = DatabaseManager()
     session = user_learning_sessions.get(user_id)
     correctCard = None
 
@@ -236,7 +238,7 @@ async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Deck '{deck_name}' already exists.")
     if update.message.reply_to_message and "Enter Deck Name that you want to DELETE" == update.message.reply_to_message.text:
         deck_name = update.message.text
-        if db.get_deck(deck_name):
+        if db.get_deck(deck_name, user_id):
             db.delete_deck(deck_name, user_id)
             await update.message.reply_text(f"Deck '{deck_name}' deleted.")
         else:
@@ -288,7 +290,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    db = DatabaseManager(user_id)
+    #db = DatabaseManager()
 
     if query.data == "command_add_deck":
         await query.message.reply_text(
@@ -312,9 +314,9 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         page_ce = 0
         if query.data.startswith("page_ce_"):
             page_ce = query.data.split("page_ce_")[1]
-        cards = db.select_cards(user_general_session[user_id]["deck_name"])
+        cards = db.select_cards(user_general_session[user_id]["deck_name"], user_id)
         deck_id = ""
-        for deck in db.decks:
+        for deck in db.get_all_decks(user_id):
             if deck.name == user_general_session[user_id]["deck_name"]:
                 deck_id = deck.id
         keyboard_ce = __list_cards(cards, page_ce)
@@ -324,9 +326,9 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text="Delete card from Deck " + user_general_session[user_id]["deck_name"], reply_markup=InlineKeyboardMarkup(keyboard_ce))
         return
     if query.data == "command_switch_deck":
-        db = DatabaseManager(user_id)
-        deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
-        deck_names = [deck.name for deck in sorted(db.decks, key=lambda deck: deck.name)]
+        #db = DatabaseManager()
+        deck_ids = [deck.id for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
+        deck_names = [deck.name for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
         if (user_id not in user_general_session):
             user_general_session[user_id] = {}
 
@@ -341,7 +343,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if query.data == "command_learn_deck":
         deck_name = user_general_session[user_id]["deck_name"]
-        cards = db.select_cards_for_learning(deck_name)
+        cards = db.select_cards_for_learning(deck_name, user_id)
         if not cards:
             await query.message.reply_text(f"No cards available for learning in deck '{deck_name}'.")
             return
@@ -368,7 +370,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_general_session[user_id] = {}
 
         deck_id = query.data.split("deck_")[1]
-        for deck in db.decks:
+        for deck in db.get_all_decks(user_id):
             if deck.id == deck_id:
                 user_general_session[user_id]["deck_name"] = deck.name
         keyboard = [
@@ -383,17 +385,17 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if query.data.startswith("page_"):
         page = int(query.data.split("page_")[1])
-        deck_ids = [deck.id for deck in sorted(db.decks, key=lambda deck: deck.name)]
-        deck_names = [deck.name for deck in sorted(db.decks, key=lambda deck: deck.name)]
+        deck_ids = [deck.id for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
+        deck_names = [deck.name for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
         keyboard = __list_decks(deck_ids, deck_names, page)
         await query.edit_message_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     if query.data.startswith("delete_card_"):
         id = (query.data.split("delete_card_")[1])
         db.delete_card(user_general_session[user_id]["deck_name"], id, user_id)
-        cards = db.select_cards(user_general_session[user_id]["deck_name"])
+        cards = db.select_cards(user_general_session[user_id]["deck_name"], user_id)
         deck_id = ""
-        for deck in db.decks:
+        for deck in db.get_all_decks(user_id):
             if deck.name == user_general_session[user_id]["deck_name"]:
                 deck_id = deck.id
         keyboard_ce = __list_cards(cards, 0)
