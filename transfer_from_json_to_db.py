@@ -3,7 +3,15 @@ import pg8000
 from urllib.parse import urlparse
 import glob
 import os
+import random
+import time
+import uuid
 
+
+def generate_uuid4():
+    rnd = (random.Random())
+    rnd.seed(time.time() * 1000)
+    return str(uuid.UUID(int=rnd.getrandbits(128), version=4))
 
 def insert_data_from_json_files(database_url, json_files):
     # Parse database URL
@@ -27,23 +35,25 @@ def insert_data_from_json_files(database_url, json_files):
 
         for deck in decks:
             # Insert into decks table
+            deck_id = generate_uuid4();
             cursor.execute(
                 "INSERT INTO decks (id, name, user_id) VALUES (%s, %s, %s)",
-                (deck["id"], deck["name"], user_id)
+                (deck_id, deck["name"], user_id)
             )
 
             print("deck_saved")
 
             for card in deck.get("cards", []):
                 # Insert into cards table
+                card_id = generate_uuid4();
                 cursor.execute(
                     """
                     INSERT INTO cards (id, deck_id, user_id, front, back, last_revised, level)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        card["id"],
-                        deck["id"],
+                        card_id,
+                        deck_id,
                         user_id,
                         card["front"],
                         card["back"],
@@ -59,16 +69,25 @@ def insert_data_from_json_files(database_url, json_files):
     conn.close()
 
 
+def truncate_db(database_url):
+    parsed_url = urlparse(database_url)
+    conn = pg8000.connect(
+        user=parsed_url.username,
+        password=parsed_url.password,
+        host=parsed_url.hostname,
+        port=parsed_url.port or 5432,
+        database=parsed_url.path.lstrip("/")
+    )
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM decks",
+    )
+    cursor.execute(
+        "DELETE FROM cards",
+    )
+
 # Example usage
-database_url = ""
-json_files = glob.glob("34268343.json")
-insert_data_from_json_files(database_url, json_files)
+database_url = "db_url"
 
-json_files = glob.glob("52882608.json")
-insert_data_from_json_files(database_url, json_files)
-
-json_files = glob.glob("190177690.json")
-insert_data_from_json_files(database_url, json_files)
-
-json_files = glob.glob("201428145.json")
+json_files = glob.glob("[id].json")
 insert_data_from_json_files(database_url, json_files)
