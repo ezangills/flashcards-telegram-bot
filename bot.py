@@ -30,17 +30,16 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if (update.message.from_user.id not in user_general_session):
         user_general_session[update.message.from_user.id] = {}
     keyboard = [
-        [InlineKeyboardButton("List Decks", callback_data=f"command_switch_deck"), InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck")]
+        [InlineKeyboardButton("📁List Decks", callback_data=f"command_switch_deck"), InlineKeyboardButton("➕Add a Deck", callback_data=f"command_add_deck")]
     ]
     await update.message.reply_text(text="Menu", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 async def get_keyboard():
     return [
-        [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
-        [InlineKeyboardButton("Traverse Top to Bottom", callback_data=f"traverse_top_to_bot"), InlineKeyboardButton("Traverse Bottom to Top", callback_data=f"traverse_bot_to_top")],
-        [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
-        [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
+        [InlineKeyboardButton("📁Decks Menu", callback_data=f"command_switch_deck"), InlineKeyboardButton("🙋Learn", callback_data=f"command_learn_deck")],
+        [InlineKeyboardButton("🏃Traverse Front to Back", callback_data=f"traverse_top_to_bot"), InlineKeyboardButton("💃Traverse Back to Front", callback_data=f"traverse_bot_to_top")],
+        [InlineKeyboardButton("➕Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("➖Delete Cards", callback_data=f"command_delete_cards_in_deck")],
     ]
 
 
@@ -58,7 +57,7 @@ async def cancel_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     else:
         keyboard = [
-            [InlineKeyboardButton("List Decks", callback_data=f"command_switch_deck"), InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck")]
+            [InlineKeyboardButton("📁List Decks", callback_data=f"command_switch_deck"), InlineKeyboardButton("➕Add a Deck", callback_data=f"command_add_deck")]
         ]
         await update.message.reply_text(text="Menu", reply_markup=InlineKeyboardMarkup(keyboard))
         return
@@ -108,7 +107,7 @@ async def traverse_cards(update: Update, user_id, is_reversed, context: ContextT
     card = cards[current_traverse_index]
 
     keyboard = [
-        [InlineKeyboardButton("Reveal other side", callback_data=f"show_and_traverse")]
+        [InlineKeyboardButton("👁️Reveal other side", callback_data=f"show_and_traverse")]
     ]
 
     if not is_reversed:
@@ -231,7 +230,7 @@ async def show_results(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.edit_card(user_general_session[update.message.from_user.id]["deck_name"], card.front, card.back, card.level, user_id)
     # Display results
     keyboard = await get_keyboard()
-    result_message = "Learning Session Complete! Results:\n" + "\n".join(results) + "Current Deck: " + user_general_session[user_id]["deck_name"]
+    result_message = "Learning Session Complete! Results:\n" + "\n".join(results) + "\nCurrent Deck: " + user_general_session[user_id]["deck_name"]
     await update.message.reply_text(
         text=result_message,
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -282,16 +281,20 @@ async def handle_name_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message and "Enter Deck Name" == update.message.reply_to_message.text:
         deck_name = update.message.text  # The user's input
         if db.add_deck(deck_name, user_id):
-            await update.message.reply_text(f"Deck '{deck_name}' created.")
+            keyboard = await get_keyboard()
+            await update.message.reply_text(f"Deck '{deck_name}' created. Current deck: '{deck_name}'", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             await update.message.reply_text(f"Deck '{deck_name}' already exists.")
+        return
     if update.message.reply_to_message and "Enter Deck Name that you want to DELETE" == update.message.reply_to_message.text:
         deck_name = update.message.text
         if db.get_deck(deck_name, user_id):
             db.delete_deck(deck_name, user_id)
             await update.message.reply_text(f"Deck '{deck_name}' deleted.")
+            await list_decks(update, context)
         else:
             await update.message.reply_text(f"Deck '{deck_name}' not found.")
+        return
     if "deck_name" in user_general_session[user_id]:
         if update.message.reply_to_message and "Type in FRONT (Deck: " + user_general_session[user_id]["deck_name"] + ")\n/cancel to stop adding (or any command)" == update.message.reply_to_message.text:
             user_general_session[user_id]["front"] = update.message.text
@@ -528,6 +531,12 @@ async def __list_decks(deck_ids, deck_names, page):
         navigation_buttons.append(InlineKeyboardButton("➡️ Next", callback_data=f"page_{page + 1}"))
     if navigation_buttons:
         keyboard.append(navigation_buttons)
+
+    editing_buttons = []
+    editing_buttons.append(InlineKeyboardButton("➕Add a Deck", callback_data=f"command_add_deck"))
+    editing_buttons.append(InlineKeyboardButton("➖Delete a Deck", callback_data=f"command_delete_deck"))
+
+    keyboard.append(editing_buttons)
     return keyboard
 
 async def generate_options(correct_card, all_cards, attribute):
@@ -541,7 +550,7 @@ async def generate_options(correct_card, all_cards, attribute):
 def main():
     bot_token = os.getenv("BOT_TOKEN")
     app = ApplicationBuilder().token(bot_token).build()
-    app.add_handler(CommandHandler("start", list_decks))
+    app.add_handler(CommandHandler("start", show_menu))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("menu", show_menu))
     app.add_handler(CommandHandler("list", list_decks))
