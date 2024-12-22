@@ -1,4 +1,7 @@
 import configparser
+from pyexpat.errors import messages
+
+from asn1crypto.core import Boolean
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ForceReply
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
@@ -32,17 +35,22 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text="Menu", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
+async def get_keyboard():
+    return [
+        [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
+        [InlineKeyboardButton("Traverse Top to Bottom", callback_data=f"traverse_top_to_bot"), InlineKeyboardButton("Traverse Bottom to Top", callback_data=f"traverse_bot_to_top")],
+        [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
+        [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
+    ]
+
+
 async def cancel_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if (user_id not in user_general_session):
         user_general_session[user_id] = {}
 
     if user_general_session[user_id]["deck_name"]:
-        keyboard = [
-            [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
-            [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
-            [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
-        ]
+        keyboard = await get_keyboard()
         await update.message.reply_text(
             text="Current Deck: " + user_general_session[user_id]["deck_name"],
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -67,18 +75,63 @@ async def list_decks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_general_session[update.message.from_user.id]["page"] = 0
     page = user_general_session[update.message.from_user.id]["page"]
     if deck_ids:
-        keyboard = __list_decks(deck_ids, deck_names, page)
+        keyboard = await __list_decks(deck_ids, deck_names, page)
         await update.message.reply_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
     else:
         await update.message.reply_text("No decks available.")
         await show_menu(update, context)
 
 
+async def traverse_cards(update: Update, user_id, is_reversed, context: ContextTypes.DEFAULT_TYPE):
+    session = user_general_session.get(user_id)
+
+    if not session:
+        await update.message.reply_text("No active general traverse session.")
+        return
+
+    session["traversing_is_reverse"] = is_reversed
+    cards = session["traversing_cards"]
+    current_traverse_index = session["traverse_current_card_index"]
+
+    if current_traverse_index >= len(cards):
+        session["traverse_current_card_index"] = None
+        session["traversing_is_reverse"] = None
+        session["traversing_cards"] = {}
+        keyboard = await get_keyboard()
+        result_message = "Current Deck: " + user_general_session[user_id]["deck_name"]
+        await update.message.reply_text(
+            text=result_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    card = cards[current_traverse_index]
+
+    keyboard = [
+        [InlineKeyboardButton("Reveal other side", callback_data=f"show_and_traverse")]
+    ]
+
+    if not is_reversed:
+        message = f"What is the other side for: '{card.front}'?"
+        await update.message.reply_text(
+            text=message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        message = f"What is the other side for: '{card.back}'?"
+        await update.message.reply_text(
+            text=message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    session["traverse_current_card_index"] += 1
+
+
 async def present_next_card(update: Update, user_id, context: ContextTypes.DEFAULT_TYPE):
     session = user_learning_sessions.get(user_id)
 
     if not session:
-        await update.message.reply_text("No active learning session. Use /learn <deck_name> to start.")
+        await update.message.reply_text("No active learning session.")
         return
 
     cards = session["cards"]
@@ -100,7 +153,7 @@ async def present_next_card(update: Update, user_id, context: ContextTypes.DEFAU
 
     if current_step == 1:
         # Step 1: Multiple-choice for backs
-        options = generate_options(card, cards, "back")
+        options = await generate_options(card, cards, "back")
         message = f"Step 1: What is the back for: '{card.front}'?"
         await send_options(update, context, message, options, card.back, card.id)
 
@@ -112,7 +165,7 @@ async def present_next_card(update: Update, user_id, context: ContextTypes.DEFAU
 
     elif current_step == 3:
         # Step 3: Multiple-choice for fronts
-        options = generate_options(card, cards, "front")
+        options = await generate_options(card, cards, "front")
         message = f"Step 3: What is the front for: '{card.back}'?"
         await send_options(update, context, message, options, card.front, card.id)
 
@@ -177,11 +230,7 @@ async def show_results(update: Update, context: ContextTypes.DEFAULT_TYPE):
         results.append(f"Card '{card.front}' - Correct: {correct}, Incorrect: {incorrect}, Level: {card.level}")
         db.edit_card(user_general_session[update.message.from_user.id]["deck_name"], card.front, card.back, card.level, user_id)
     # Display results
-    keyboard = [
-        [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
-        [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
-        [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
-    ]
+    keyboard = await get_keyboard()
     result_message = "Learning Session Complete! Results:\n" + "\n".join(results) + "Current Deck: " + user_general_session[user_id]["deck_name"]
     await update.message.reply_text(
         text=result_message,
@@ -319,7 +368,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for deck in db.get_all_decks(user_id):
             if deck.name == user_general_session[user_id]["deck_name"]:
                 deck_id = deck.id
-        keyboard_ce = __list_cards(cards, page_ce)
+        keyboard_ce = await __list_cards(cards, page_ce)
         navigation_buttons_ce = []
         navigation_buttons_ce.append(InlineKeyboardButton("🚫Exit", callback_data="deck_" + deck_id))
         keyboard_ce.append(navigation_buttons_ce)
@@ -335,7 +384,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_general_session[user_id]["page"] = 0
         page = user_general_session[user_id]["page"]
         if deck_ids:
-            keyboard = __list_decks(deck_ids, deck_names, page)
+            keyboard = await __list_decks(deck_ids, deck_names, page)
             await query.edit_message_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             await query.edit_message_text("No decks available.")
@@ -365,6 +414,42 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Proceed to the first card
         await present_next_card(query, user_id, context)
         return
+    if query.data == "traverse_top_to_bot":
+        deck_name = user_general_session[user_id]["deck_name"]
+        cards = db.select_cards(deck_name, user_id)
+        if not cards:
+            await query.message.reply_text(f"No cards available for learning in deck '{deck_name}'.")
+            return
+        user_general_session[user_id]["traversing_cards"] = cards
+        user_general_session[user_id]["traverse_current_card_index"] = 0
+        await traverse_cards(query, user_id, False, context)
+
+        return
+    if query.data == "traverse_bot_to_top":
+        deck_name = user_general_session[user_id]["deck_name"]
+        cards = db.select_cards(deck_name, user_id)
+        if not cards:
+            await query.message.reply_text(f"No cards available for learning in deck '{deck_name}'.")
+            return
+        user_general_session[user_id]["traversing_cards"] = cards
+        user_general_session[user_id]["traverse_current_card_index"] = 0
+        await traverse_cards(query, user_id, True, context)
+
+        return
+    if query.data == "show_and_traverse":
+        session = user_general_session[user_id]
+        traversing_cards = session["traversing_cards"]
+        current_traverse_index = session["traverse_current_card_index"] - 1
+        card = traversing_cards[current_traverse_index]
+
+        await query.message.edit_text(text=query.message.text, reply_markup=None)
+        if not Boolean(session["traversing_is_reverse"]):
+            await query.message.reply_text(text=f"Actual: {card.back}")
+        elif Boolean(session["traversing_is_reverse"]):
+            await query.message.reply_text(text=f"Actual: {card.front}")
+        await traverse_cards(query, user_id, session["traversing_is_reverse"], context)
+
+        return
     if query.data.startswith("deck_"):
         if (user_id not in user_general_session):
             user_general_session[user_id] = {}
@@ -373,11 +458,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for deck in db.get_all_decks(user_id):
             if deck.id == deck_id:
                 user_general_session[user_id]["deck_name"] = deck.name
-        keyboard = [
-            [InlineKeyboardButton("Switch Deck", callback_data=f"command_switch_deck"), InlineKeyboardButton("Learn", callback_data=f"command_learn_deck")],
-            [InlineKeyboardButton("Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("Delete Cards", callback_data=f"command_delete_cards_in_deck")],
-            [InlineKeyboardButton("Add a Deck", callback_data=f"command_add_deck"), InlineKeyboardButton("Delete a Deck", callback_data=f"command_delete_deck")]
-        ]
+        keyboard = await get_keyboard()
         await query.edit_message_text(
             text="Current Deck: " + user_general_session[user_id]["deck_name"],
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -387,7 +468,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         page = int(query.data.split("page_")[1])
         deck_ids = [deck.id for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
         deck_names = [deck.name for deck in sorted(db.get_all_decks(user_id), key=lambda deck: deck.name)]
-        keyboard = __list_decks(deck_ids, deck_names, page)
+        keyboard = await __list_decks(deck_ids, deck_names, page)
         await query.edit_message_text(text="Pick a Deck", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     if query.data.startswith("delete_card_"):
@@ -398,7 +479,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for deck in db.get_all_decks(user_id):
             if deck.name == user_general_session[user_id]["deck_name"]:
                 deck_id = deck.id
-        keyboard_ce = __list_cards(cards, 0)
+        keyboard_ce = await __list_cards(cards, 0)
         navigation_buttons_ce = []
         navigation_buttons_ce.append(InlineKeyboardButton("🚫Exit", callback_data="deck_" + deck_id))
         keyboard_ce.append(navigation_buttons_ce)
@@ -416,7 +497,7 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await present_next_card(query, user_id, context)
 
 
-def __list_cards(cards, page_ce):
+async def __list_cards(cards, page_ce):
     items_per_page_ce = 5
     total_pages_ce = int(len(cards) / items_per_page_ce)
     start_index_ce = int(page_ce) * items_per_page_ce
@@ -431,7 +512,7 @@ def __list_cards(cards, page_ce):
         keyboard_ce.append(navigation_buttons_ce)
     return keyboard_ce
 
-def __list_decks(deck_ids, deck_names, page):
+async def __list_decks(deck_ids, deck_names, page):
     items_per_page = 5
     total_pages = int(len(deck_ids) / items_per_page)
     start_index = page * items_per_page
@@ -449,7 +530,7 @@ def __list_decks(deck_ids, deck_names, page):
         keyboard.append(navigation_buttons)
     return keyboard
 
-def generate_options(correct_card, all_cards, attribute):
+async def generate_options(correct_card, all_cards, attribute):
     options = set(getattr(card, attribute) for card in all_cards if card != correct_card)
     options = list(options)[:3]  # Choose 3 random incorrect options
     options.append(getattr(correct_card, attribute))  # Add the correct option
