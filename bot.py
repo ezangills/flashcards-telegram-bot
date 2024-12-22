@@ -38,7 +38,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def get_keyboard():
     return [
         [InlineKeyboardButton("📁Decks Menu", callback_data=f"command_switch_deck"), InlineKeyboardButton("🙋Learn", callback_data=f"command_learn_deck")],
-        [InlineKeyboardButton("🏃Traverse Front to Back", callback_data=f"traverse_top_to_bot"), InlineKeyboardButton("💃Traverse Back to Front", callback_data=f"traverse_bot_to_top")],
+        [InlineKeyboardButton("🏃Traverse F to B", callback_data=f"traverse_top_to_bot"), InlineKeyboardButton("💃Traverse B to F", callback_data=f"traverse_bot_to_top")],
         [InlineKeyboardButton("➕Add Cards", callback_data=f"command_add_cards_to_deck"), InlineKeyboardButton("➖Delete Cards", callback_data=f"command_delete_cards_in_deck")],
     ]
 
