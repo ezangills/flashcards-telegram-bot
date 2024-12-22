@@ -541,7 +541,7 @@ async def generate_options(correct_card, all_cards, attribute):
 def main():
     bot_token = os.getenv("BOT_TOKEN")
     app = ApplicationBuilder().token(bot_token).build()
-    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("start", list_decks))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("menu", show_menu))
     app.add_handler(CommandHandler("list", list_decks))
