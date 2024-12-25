@@ -516,7 +516,7 @@ async def __list_cards(cards, page_ce):
     return keyboard_ce
 
 async def __list_decks(deck_ids, deck_names, page):
-    items_per_page = 5
+    items_per_page = 10
     total_pages = int(len(deck_ids) / items_per_page)
     start_index = page * items_per_page
     end_index = start_index + items_per_page
